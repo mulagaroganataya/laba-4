@@ -8,7 +8,7 @@ from wiki_api import WikimediaOnThisDayClient
 def format_items(payload: dict, otd_type: str, limit: int) -> str:
     items = payload.get(otd_type, [])
     if not isinstance(items, list) or not items:
-        return "Ничего не найдено 😕"
+        return "Ничего не найдено"
 
     lines: list[str] = []
     for it in items[:limit]:
