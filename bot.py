@@ -1,12 +1,15 @@
 import re
 from datetime import datetime
+from typing import Any
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 
-from config import WIKI_LANG
+from config import WIKI_LANG, DEFAULT_TYPE, DEFAULT_LIMIT
 from wiki_api import WikimediaOnThisDayClient, WikiAPIError
+
+USERS: dict[int, dict[str, Any]] = {}
 
 _DATE_RE = re.compile(r"^\s*(\d{2})[.\s](\d{2})\s*$")
 
@@ -15,19 +18,22 @@ class DateParseError(Exception):
     pass
 
 
+def get_settings(user_id: int) -> dict[str, Any]:
+    if user_id not in USERS:
+        USERS[user_id] = {"type": DEFAULT_TYPE, "limit": DEFAULT_LIMIT}
+    return USERS[user_id]
+
+
 def parse_user_date(text: str) -> tuple[int, int]:
     m = _DATE_RE.match(text or "")
     if not m:
         raise DateParseError("Неверный формат. Пример: /date 02.01 или /date 02 01")
-
     day = int(m.group(1))
     month = int(m.group(2))
-
     try:
         datetime(2000, month, day)
     except ValueError as e:
-        raise DateParseError("Такой даты не существует.")
-
+        raise DateParseError("Такой даты не существует.") from e
     return month, day
 
 
@@ -48,10 +54,14 @@ def create_dispatcher() -> Dispatcher:
     router = Router()
     api = WikimediaOnThisDayClient()
 
-    async def send_events(message: Message, month: int, day: int) -> None:
+    async def send_for(message: Message, month: int, day: int) -> None:
+        s = get_settings(message.from_user.id)
+        otd_type = s["type"]
+        limit = s["limit"]
+
         try:
-            payload = await api.fetch(WIKI_LANG, "events", month, day)
-            await message.answer(format_items(payload, "events", 5))
+            payload = await api.fetch(WIKI_LANG, otd_type, month, day)
+            await message.answer(format_items(payload, otd_type, limit))
         except WikiAPIError as e:
             await message.answer(f"Ошибка API: {e}")
 
@@ -62,7 +72,7 @@ def create_dispatcher() -> Dispatcher:
     @router.message(Command("today"))
     async def today_cmd(message: Message):
         now = datetime.now()
-        await send_events(message, now.month, now.day)
+        await send_for(message, now.month, now.day)
 
     @router.message(Command("date"))
     async def date_cmd(message: Message):
@@ -75,7 +85,7 @@ def create_dispatcher() -> Dispatcher:
         except DateParseError as e:
             await message.answer(f"{e}")
             return
-        await send_events(message, m, d)
+        await send_for(message, m, d)
 
     dp = Dispatcher()
     dp.include_router(router)
