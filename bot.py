@@ -55,9 +55,19 @@ def format_items(payload: dict, otd_type: str, limit: int) -> str:
     lines: list[str] = []
     for it in items[:limit]:
         year = it.get("year", "—")
-        text = (it.get("text") or "").strip() or "Без описания"
-        lines.append(f"• {year} — {text}")
-    return "\n".join(lines)
+        text = (it.get("text") or "").strip()
+
+        link = None
+        pages = it.get("pages", [])
+        if isinstance(pages, list) and pages:
+            link = pages[0].get("content_urls", {}).get("desktop", {}).get("page")
+
+        if link:
+            lines.append(f"• {year} — {text}\n  {link}")
+        else:
+            lines.append(f"• {year} — {text}")
+
+    return "\n\n".join(lines)
 
 
 def help_text() -> str:
