@@ -60,6 +60,18 @@ def format_items(payload: dict, otd_type: str, limit: int) -> str:
     return "\n".join(lines)
 
 
+def help_text() -> str:
+    return (
+        "Команды:\n"
+        "    /today — события на сегодня\n"
+        "    /date <dd.mm|dd mm> — события на дату\n"
+        "    /type <events|births|deaths|holidays>\n"
+        f"    /limit <{MIN_LIMIT}-{MAX_LIMIT}>\n"
+        "    /settings — показать настройки\n\n"
+        "Язык: русский (ru)\n"
+    )
+
+
 def create_dispatcher() -> Dispatcher:
     router = Router()
     api = WikimediaOnThisDayClient()
@@ -76,7 +88,21 @@ def create_dispatcher() -> Dispatcher:
 
     @router.message(CommandStart())
     async def start(message: Message):
-        await message.answer("Привет! Команды: /today, /date, /type, /limit")
+        await message.answer("Привет! Я бот «Исторические события».\n\n" + help_text())
+
+    @router.message(Command("help"))
+    async def help_cmd(message: Message):
+        await message.answer(help_text())
+
+    @router.message(Command("settings"))
+    async def settings_cmd(message: Message):
+        s = get_settings(message.from_user.id)
+        await message.answer(
+            "Настройки:\n"
+            f"Тип: {s['type']}\n"
+            f"Лимит: {s['limit']}\n"
+            f"Язык: {WIKI_LANG}\n"
+        )
 
     @router.message(Command("today"))
     async def today_cmd(message: Message):
@@ -120,7 +146,7 @@ def create_dispatcher() -> Dispatcher:
             if not (MIN_LIMIT <= n <= MAX_LIMIT):
                 raise ValueError
         except ValueError:
-            await message.answer(f"❌ Лимит: {MIN_LIMIT}-{MAX_LIMIT}")
+            await message.answer(f"Лимит: {MIN_LIMIT}-{MAX_LIMIT}")
             return
         get_settings(message.from_user.id)["limit"] = n
         await message.answer(f"Лимит сохранён: {n}")
