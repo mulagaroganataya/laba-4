@@ -34,8 +34,8 @@ class WikimediaOnThisDayClient:
                         raise WikiAPIError(f"API вернул {resp.status}: {text[:200]}")
                     return await resp.json()
         except asyncio.TimeoutError as e:
-            raise WikiAPIError("Таймаут при обращении к API.")
+            raise WikiAPIError("Таймаут при обращении к API.") from e
         except aiohttp.ClientError as e:
-            raise WikiAPIError("Ошибка сети при обращении к API.")
+            raise WikiAPIError("Ошибка сети при обращении к API.") from e
         except ValueError as e:
-            raise WikiAPIError("Ошибка разбора JSON-ответа API.")
+            raise WikiAPIError("Ошибка разбора JSON-ответа API.") from e

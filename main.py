@@ -1,9 +1,10 @@
 import asyncio
+
 from config import BOT_TOKEN
 from bot import run_bot
 
 
-def main() -> None:
+def main():
     if not BOT_TOKEN:
         raise RuntimeError("Не найден BOT_TOKEN в переменных окружения.")
     asyncio.run(run_bot(BOT_TOKEN))
