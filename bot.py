@@ -6,7 +6,12 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 
-from config import WIKI_LANG, DEFAULT_TYPE, DEFAULT_LIMIT
+from config import (
+    WIKI_LANG,
+    DEFAULT_TYPE, DEFAULT_LIMIT,
+    ALLOWED_TYPES,
+    MIN_LIMIT, MAX_LIMIT,
+)
 from wiki_api import WikimediaOnThisDayClient, WikiAPIError
 
 USERS: dict[int, dict[str, Any]] = {}
@@ -37,6 +42,11 @@ def parse_user_date(text: str) -> tuple[int, int]:
     return month, day
 
 
+def today_md() -> tuple[int, int]:
+    now = datetime.now()
+    return now.month, now.day
+
+
 def format_items(payload: dict, otd_type: str, limit: int) -> str:
     items = payload.get(otd_type, [])
     if not isinstance(items, list) or not items:
@@ -58,7 +68,6 @@ def create_dispatcher() -> Dispatcher:
         s = get_settings(message.from_user.id)
         otd_type = s["type"]
         limit = s["limit"]
-
         try:
             payload = await api.fetch(WIKI_LANG, otd_type, month, day)
             await message.answer(format_items(payload, otd_type, limit))
@@ -67,12 +76,12 @@ def create_dispatcher() -> Dispatcher:
 
     @router.message(CommandStart())
     async def start(message: Message):
-        await message.answer("Привет! Команды: /today, /date 02.01")
+        await message.answer("Привет! Команды: /today, /date, /type, /limit")
 
     @router.message(Command("today"))
     async def today_cmd(message: Message):
-        now = datetime.now()
-        await send_for(message, now.month, now.day)
+        m, d = today_md()
+        await send_for(message, m, d)
 
     @router.message(Command("date"))
     async def date_cmd(message: Message):
@@ -86,6 +95,35 @@ def create_dispatcher() -> Dispatcher:
             await message.answer(f"{e}")
             return
         await send_for(message, m, d)
+
+    @router.message(Command("type"))
+    async def type_cmd(message: Message):
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("Использование: /type events")
+            return
+        t = parts[1].strip().lower()
+        if t not in ALLOWED_TYPES:
+            await message.answer("Доступно: events, births, deaths, holidays")
+            return
+        get_settings(message.from_user.id)["type"] = t
+        await message.answer(f"Тип сохранён: {t}")
+
+    @router.message(Command("limit"))
+    async def limit_cmd(message: Message):
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer(f"Использование: /limit {DEFAULT_LIMIT}")
+            return
+        try:
+            n = int(parts[1])
+            if not (MIN_LIMIT <= n <= MAX_LIMIT):
+                raise ValueError
+        except ValueError:
+            await message.answer(f"❌ Лимит: {MIN_LIMIT}-{MAX_LIMIT}")
+            return
+        get_settings(message.from_user.id)["limit"] = n
+        await message.answer(f"Лимит сохранён: {n}")
 
     dp = Dispatcher()
     dp.include_router(router)
